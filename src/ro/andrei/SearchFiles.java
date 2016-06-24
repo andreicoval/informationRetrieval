@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.ro.RomanianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
@@ -97,7 +98,7 @@ public class SearchFiles {
     private static void doSearch(String field, String queryString)
             throws IOException, ParseException {
 
-        Analyzer analyzer = new StandardAnalyzer();
+        Analyzer analyzer = new RomanianAnalyzer();
         QueryParser parser = new QueryParser(field, analyzer);
         Query query = parser.parse(queryString);
 

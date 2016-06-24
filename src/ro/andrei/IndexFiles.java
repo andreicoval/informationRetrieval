@@ -21,6 +21,7 @@ import java.io.*;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.ro.RomanianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.IndexWriter;
@@ -75,7 +76,7 @@ public class IndexFiles
         Directory directory = FSDirectory.open(indexDir.toPath());
 
 //        creem si configuram writerul de index
-        Analyzer analyzer = new StandardAnalyzer();
+        Analyzer analyzer = new RomanianAnalyzer();
         IndexWriterConfig conf = new IndexWriterConfig(analyzer);
         IndexWriter writer = new IndexWriter(directory, conf);
 
