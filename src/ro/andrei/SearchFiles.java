@@ -98,6 +98,7 @@ public class SearchFiles {
     private static void doSearch(String field, String queryString)
             throws IOException, ParseException {
 
+//        folosim analizator pentru limba romana
         Analyzer analyzer = new RomanianAnalyzer();
         QueryParser parser = new QueryParser(field, analyzer);
         Query query = parser.parse(queryString);
