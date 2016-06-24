@@ -25,28 +25,25 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.*;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.queries.*;
 
 /**
  * Simple command-line based search demo.
  */
-public class SearchFiles
-{
+public class SearchFiles {
 
-    private SearchFiles()
-    {
+    private SearchFiles() {
     }
 
     /**
      * Simple command-line based search demo.
      */
-    public static void main(String[] args) throws Exception
-    {
+    public static void main(String[] args) throws Exception {
         String indexPath = IndexFiles.INDEX_LOCATION;
         String field = "contents";
         String queryString = "informaţie";
@@ -70,32 +67,87 @@ public class SearchFiles
     }
 
     private static void doSearch(IndexSearcher searcher, Query query, int hitsPerQuery)
-            throws IOException
-    {
+            throws IOException {
         searcher.search(query, 100);
 
-        // Collect enough docs to show 5 pages
-        TopDocs results = searcher.search(query, hitsPerQuery);
-        ScoreDoc[] hits = results.scoreDocs;
+        CustomScoreQuery customQuery = new ACustomScoreQuery(query);
+
+        TopDocs results = searcher.search(customQuery, hitsPerQuery);
+        ScoreDoc[] foundDocs = results.scoreDocs;
 
         int numTotalHits = results.totalHits;
         System.out.println(numTotalHits + " total matching documents");
 
-        for (int i = 0; i < hits.length; i++)
-        {
-            Document doc = searcher.doc(hits[i].doc);
+        for (int i = 0; i < foundDocs.length; i++) {
+            Document doc = searcher.doc(foundDocs[i].doc);
             String path = doc.get("path");
-            if (path != null)
-            {
-                System.out.println(hits[i].doc + ". " + path);
-                System.out.println(" --> score=" + hits[i].score);
+            if (path != null) {
+                System.out.println(foundDocs[i].doc + ". " + path);
+                System.out.println(" --> score=" + foundDocs[i].score);
+
+                Explanation explanation = searcher.explain(query, foundDocs[i].doc);
+
+                System.out.println(" --> explanation=");
+                System.out.println(explanation.toString());
                 System.out.println("");
-            }
-            else
-            {
+                System.out.println("");
+            } else {
                 System.out.println((i + 1) + ". " + "No path for this document");
             }
 
         }
     }
+}
+
+class ACustomScoreQuery extends CustomScoreQuery {
+
+    public ACustomScoreQuery(Query subQuery) {
+        super(subQuery);
+    }
+
+    @Override
+    public CustomScoreProvider getCustomScoreProvider(final LeafReaderContext atomicContext) {
+        return new ACustomScoreProvider(atomicContext);
+    }
+
+}
+
+class ACustomScoreProvider extends CustomScoreProvider {
+
+    private static LeafReader atomicReader;
+
+    public ACustomScoreProvider(LeafReaderContext context)
+    {
+        super(context);
+
+        atomicReader = context.reader();
+    }
+
+    @Override
+    public float customScore(int doc, float subQueryScore, float valSrcScore) throws IOException
+    {
+        Document docAtHand = atomicReader.document(doc);
+        String[] itemOrigin = docAtHand.getValues("originOfItem");
+        boolean originIndia = false;
+
+        for (int counter = 0; counter < itemOrigin.length; counter++)
+        {
+            if (itemOrigin[counter] != null && itemOrigin[counter].equalsIgnoreCase("India"))
+            {
+                originIndia = true;
+                break;
+            }
+        }
+
+        if (originIndia)
+        {
+            return 3.0f;
+        }
+        else
+        {
+            return subQueryScore;
+        }
+
+    }
+
 }
