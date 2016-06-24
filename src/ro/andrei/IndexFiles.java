@@ -33,6 +33,7 @@ import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.Parser;
 import org.apache.tika.sax.BodyContentHandler;
+import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
@@ -59,6 +60,7 @@ public class IndexFiles
 
     public static void main(String[] args) throws IOException {
 
+//        setam locatiile cu care vom lucra
         File docs     = new File(DOCUMENTS_LOCATION);
         File indexDir = new File(INDEX_LOCATION);
 
@@ -69,24 +71,42 @@ public class IndexFiles
         System.out.println(" --> " + INDEX_LOCATION);
         System.out.println("");
 
+//        deschidem directoriul sursa
         Directory directory = FSDirectory.open(indexDir.toPath());
 
+//        creem si configuram writerul de index
         Analyzer analyzer = new StandardAnalyzer();
         IndexWriterConfig conf = new IndexWriterConfig(analyzer);
         IndexWriter writer = new IndexWriter(directory, conf);
+
+//        stergem valorile vechi
         writer.deleteAll();
 
         System.out.println("Indexing documents:");
 
+//        pentru toate fisierele gasite in directoriul cu documente
+//        executam operatiile de mai jos, si anume indexarea
         for (File file : docs.listFiles()) {
+
+//            instantiem obiectele Tika si parserele care vor parsa si analiza documentele
             Metadata       metadata = new Metadata();
-            ContentHandler handler  = new BodyContentHandler();
+            ContentHandler handler  = new BodyContentHandler(){
+                @Override
+                public void startElement(String uri, String localName, String name, Attributes atts) throws SAXException {
+                    super.startElement(uri, localName, name, atts);
+                }
+            };
+
             ParseContext   context  = new ParseContext();
+
+//            foloseste un parser care detecteaza automat tipul documentului, din Tika
             Parser         parser   = new AutoDetectParser();
+
             InputStream    stream   = new FileInputStream(file);
 
-            System.out.println(" --> " + file.getName());
+            System.out.println("\n --> " + file.getName());
 
+//  incercam sa parsam documentul curent, deschidem, citim si analizam
             try {
                 parser.parse(stream, handler, metadata, context);
             }
@@ -103,11 +123,13 @@ public class IndexFiles
             // make a new, empty lucene document for each physical file
             Document doc = new Document();
 
+//            in urmatoarele linii vom salva informatii despre document in diferite field-uri
+
             // Add the path of the file as a field named "path".  Use a
             // field that is indexed (i.e. searchable), but don't tokenize
             // the field into separate words and don't index term frequency
             // or positional information:
-            doc.add(new StringField("path", file.toString(), Field.Store.YES));
+            doc.add(new TextField("path", fileName, Field.Store.YES));
 
 
             for (String key : metadata.names()) {
@@ -124,10 +146,15 @@ public class IndexFiles
                     }
                 }
                 else if ("title".equalsIgnoreCase(key)) {
-                    doc.add(new StringField(name, value, Field.Store.YES));
+                    System.out.println(" -- --> title: " + value);
+                    TextField titleField = new TextField(name, value, Field.Store.YES);
+//                    acest boosting va afecta in mod implicit scoringul din rezultate cautarii
+//                    pentru-ca noi consideram valorile din title ca fiind cu importanta mai mare
+                    titleField.setBoost(titleField.boost() * 3);
+                    doc.add(titleField);
                 }
                 else {
-                    doc.add(new StringField(name, fileName, Field.Store.YES));
+                    doc.add(new StringField(name, value, Field.Store.YES));
                 }
             }
 
@@ -135,7 +162,10 @@ public class IndexFiles
             // so that the text of the file is tokenized and indexed, but not stored.
             // Note that FileReader expects the file to be in UTF-8 encoding.
             // If that's not the case searching for special characters will fail.
-            doc.add(new TextField("contents", text, Field.Store.NO));
+            TextField contents = new TextField("contents", text, Field.Store.NO);
+//            aici marim importanta cuvintelor din continut
+            contents.setBoost(contents.boost() * 2);
+            doc.add(contents);
 
             // New index, so we just add the document (no old document can be there):
             writer.addDocument(doc);
